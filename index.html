@@ -10,6 +10,7 @@
   html,body { width:100%; height:100%; background:var(--bg); color:var(--text);
     font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; overflow:hidden; }
   /* 5% overscan-safe margins for TVs */
+  #stage { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; }
   .wrap { position:absolute; inset:54px 96px; display:grid;
     grid-template-columns: 1.1fr 1fr; grid-template-rows: auto 1fr auto; gap:32px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:28px; padding:36px 44px; }
@@ -20,14 +21,16 @@
   #date { font-size:38px; color:var(--dim); text-align:right; padding-bottom:14px; }
   #date b { display:block; color:var(--text); font-weight:400; font-size:44px; }
   .now { display:flex; align-items:center; gap:36px; }
-  #wIcon { font-size:120px; line-height:1; }
+  #wIcon { width:130px; height:130px; color:#cfe3ff; }
+  #wIcon svg { width:130px; height:130px; }
+  .day .i svg { width:54px; height:54px; }
   #wTemp { font-size:120px; font-weight:200; line-height:1; }
   #wDesc { font-size:36px; color:var(--text); margin-top:6px; }
   #wMeta { font-size:26px; color:var(--dim); margin-top:6px; }
   .days { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:34px; }
   .day { background:#0f1520; border:1px solid var(--line); border-radius:20px; padding:20px 8px; text-align:center; }
   .day .d { font-size:24px; color:var(--dim); }
-  .day .i { font-size:48px; margin:8px 0; }
+  .day .i { margin:8px 0; height:54px; display:flex; justify-content:center; color:#cfe3ff; }
   .day .t { font-size:28px; } .day .t span { color:var(--dim); }
   #chart { grid-row:2; min-height:0; padding:0; overflow:hidden; }
   #chart .tradingview-widget-container { width:100%; height:100%; }
@@ -36,7 +39,7 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div id="stage"><div class="wrap">
   <header>
     <div id="time">--:--<small></small></div>
     <div id="date"><b>--</b></div>
@@ -45,7 +48,7 @@
   <section class="card" id="weather">
     <div class="label" id="wPlace">Weather</div>
     <div class="now">
-      <div id="wIcon">–</div>
+      <div id="wIcon"></div>
       <div id="wTemp">--°</div>
       <div><div id="wDesc">Loading…</div><div id="wMeta"></div></div>
     </div>
@@ -55,7 +58,7 @@
   <section class="card" id="chart"></section>
 
   <footer id="ticker"></footer>
-</div>
+</div></div>
 <div id="status"></div>
 
 <script>
@@ -80,6 +83,17 @@ var CONFIG = {
 
 function $(id){ return document.getElementById(id); }
 
+/* ---- scale the 1920x1080 layout to whatever the TV browser reports (4K = 3840 wide) ---- */
+function fit(){
+  var w = window.innerWidth || 1920, hgt = window.innerHeight || 1080;
+  var s = Math.min(w/1920, hgt/1080);
+  var st = $("stage");
+  st.style.transform = "scale(" + s + ")";
+  st.style.left = Math.max(0,(w-1920*s)/2) + "px";
+  st.style.top = Math.max(0,(hgt-1080*s)/2) + "px";
+}
+fit(); window.addEventListener("resize", fit);
+
 /* ---- clock ---- */
 function tick(){
   var now = new Date();
@@ -92,13 +106,26 @@ function tick(){
 tick(); setInterval(tick, 1000);
 
 /* ---- weather (Open-Meteo, no API key) ---- */
-var WX = {0:["Clear","☀️"],1:["Mostly clear","🌤️"],2:["Partly cloudy","⛅"],3:["Overcast","☁️"],
-  45:["Fog","🌫️"],48:["Fog","🌫️"],51:["Light drizzle","🌦️"],53:["Drizzle","🌦️"],55:["Drizzle","🌦️"],
-  61:["Light rain","🌧️"],63:["Rain","🌧️"],65:["Heavy rain","🌧️"],66:["Freezing rain","🌧️"],67:["Freezing rain","🌧️"],
-  71:["Light snow","🌨️"],73:["Snow","❄️"],75:["Heavy snow","❄️"],77:["Snow grains","❄️"],
-  80:["Showers","🌦️"],81:["Showers","🌧️"],82:["Heavy showers","⛈️"],85:["Snow showers","🌨️"],86:["Snow showers","🌨️"],
-  95:["Thunderstorm","⛈️"],96:["Thunderstorm","⛈️"],99:["Thunderstorm","⛈️"]};
-function wx(c){ return WX[c] || ["—","•"]; }
+var WX = {0:["Clear","sun"],1:["Mostly clear","sun"],2:["Partly cloudy","part"],3:["Overcast","cloud"],
+  45:["Fog","fog"],48:["Fog","fog"],51:["Light drizzle","rain"],53:["Drizzle","rain"],55:["Drizzle","rain"],
+  61:["Light rain","rain"],63:["Rain","rain"],65:["Heavy rain","rain"],66:["Freezing rain","rain"],67:["Freezing rain","rain"],
+  71:["Light snow","snow"],73:["Snow","snow"],75:["Heavy snow","snow"],77:["Snow grains","snow"],
+  80:["Showers","rain"],81:["Showers","rain"],82:["Heavy showers","storm"],85:["Snow showers","snow"],86:["Snow showers","snow"],
+  95:["Thunderstorm","storm"],96:["Thunderstorm","storm"],99:["Thunderstorm","storm"]};
+var CLOUD = '<path d="M17 38h26a9 9 0 0 0 1-17.9A12 12 0 0 0 21 23a8 8 0 0 0-4 15z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>';
+var SUN = '<circle cx="32" cy="32" r="9" fill="none" stroke="currentColor" stroke-width="3"/><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M32 10v6M32 48v6M10 32h6M48 32h6M16.5 16.5l4 4M43.5 43.5l4 4M16.5 47.5l4-4M43.5 20.5l4-4"/></g>';
+function svg(inner){ return '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">'+inner+'</svg>'; }
+function icon(k){
+  if(k==="sun") return svg(SUN);
+  if(k==="part") return svg('<g transform="scale(.6)">'+SUN+'</g><g transform="translate(10,14) scale(.85)">'+CLOUD+'</g>');
+  if(k==="cloud") return svg('<g transform="translate(0,6)">'+CLOUD+'</g>');
+  if(k==="fog") return svg('<g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 24h40M8 34h44M14 44h38"/></g>');
+  if(k==="rain") return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M22 46l-3 8M33 46l-3 8M44 46l-3 8"/></g>');
+  if(k==="snow") return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><g fill="currentColor"><circle cx="21" cy="50" r="2.5"/><circle cx="32" cy="54" r="2.5"/><circle cx="43" cy="50" r="2.5"/></g>');
+  if(k==="storm") return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><path d="M34 38l-7 11h8l-5 10" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>');
+  return svg(CLOUD);
+}
+function wx(c){ return WX[c] || ["—","cloud"]; }
 
 function loadWeather(){
   var u = "https://api.open-meteo.com/v1/forecast?latitude="+CONFIG.lat+"&longitude="+CONFIG.lon+
@@ -112,7 +139,7 @@ function loadWeather(){
       var d = JSON.parse(x.responseText), c = d.current, w = wx(c.weather_code);
       var deg = CONFIG.units === "fahrenheit" ? "°F" : "°C";
       $("wPlace").textContent = CONFIG.place;
-      $("wIcon").textContent = w[1];
+      $("wIcon").innerHTML = icon(w[1]);
       $("wTemp").textContent = Math.round(c.temperature_2m) + "°";
       $("wDesc").textContent = w[0];
       $("wMeta").textContent = "Feels like " + Math.round(c.apparent_temperature) + deg + "  ·  Wind " + Math.round(c.wind_speed_10m) + " mph";
@@ -120,7 +147,7 @@ function loadWeather(){
       for (var i=0;i<d.daily.time.length;i++){
         var dt = new Date(d.daily.time[i] + "T12:00:00");
         var name = i===0 ? "Today" : dt.toLocaleDateString("en-US",{weekday:"short"});
-        html += '<div class="day"><div class="d">'+name+'</div><div class="i">'+wx(d.daily.weather_code[i])[1]+
+        html += '<div class="day"><div class="d">'+name+'</div><div class="i">'+icon(wx(d.daily.weather_code[i])[1])+
           '</div><div class="t">'+Math.round(d.daily.temperature_2m_max[i])+'° <span>'+Math.round(d.daily.temperature_2m_min[i])+'°</span></div></div>';
       }
       $("days").innerHTML = html;
