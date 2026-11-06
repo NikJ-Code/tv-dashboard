@@ -87,11 +87,11 @@ function $(id){ return document.getElementById(id); }
 var T0 = Date.now(), LOG = [];
 function fit(){
   var w = window.innerWidth || 1920, hgt = window.innerHeight || 1080;
-  var s = Math.min(w/1920, hgt/1080);
+  var s = w/1920;   /* width only: the TV briefly reports a bogus viewport height */
   var st = $("stage");
   st.style.transform = "scale(" + s + ")";
   st.style.left = Math.max(0,(w-1920*s)/2) + "px";
-  st.style.top = Math.max(0,(hgt-1080*s)/2) + "px";
+  st.style.top = "0px";
   var r = st.getBoundingClientRect();
   var cs = function(el,p){ try { return getComputedStyle(el)[p]; } catch(e){ return "?"; } };
   var line = ((Date.now()-T0)/1000).toFixed(1)+"s inner "+w+"x"+hgt+" dpr "+(window.devicePixelRatio||1)+" scale "+s.toFixed(2)+
