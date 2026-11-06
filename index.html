@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TV Dashboard</title>
+<meta name="viewport" content="width=1920, initial-scale=1">
+<style>
+  :root { --bg:#0b0f17; --card:#131a26; --line:#212c3d; --text:#eef2f8; --dim:#8b98ad; --accent:#4da3ff; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:100%; height:100%; background:var(--bg); color:var(--text);
+    font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; overflow:hidden; }
+  /* 5% overscan-safe margins for TVs */
+  .wrap { position:absolute; inset:54px 96px; display:grid;
+    grid-template-columns: 1.1fr 1fr; grid-template-rows: auto 1fr auto; gap:32px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:28px; padding:36px 44px; }
+  .label { font-size:22px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:18px; }
+  header { grid-column:1 / 3; display:flex; justify-content:space-between; align-items:flex-end; }
+  #time { font-size:150px; font-weight:200; line-height:1; letter-spacing:-.02em; }
+  #time small { font-size:48px; color:var(--dim); margin-left:14px; font-weight:300; }
+  #date { font-size:38px; color:var(--dim); text-align:right; padding-bottom:14px; }
+  #date b { display:block; color:var(--text); font-weight:400; font-size:44px; }
+  .now { display:flex; align-items:center; gap:36px; }
+  #wIcon { font-size:120px; line-height:1; }
+  #wTemp { font-size:120px; font-weight:200; line-height:1; }
+  #wDesc { font-size:36px; color:var(--text); margin-top:6px; }
+  #wMeta { font-size:26px; color:var(--dim); margin-top:6px; }
+  .days { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:34px; }
+  .day { background:#0f1520; border:1px solid var(--line); border-radius:20px; padding:20px 8px; text-align:center; }
+  .day .d { font-size:24px; color:var(--dim); }
+  .day .i { font-size:48px; margin:8px 0; }
+  .day .t { font-size:28px; } .day .t span { color:var(--dim); }
+  #chart { grid-row:2; min-height:0; padding:0; overflow:hidden; }
+  #chart .tradingview-widget-container { width:100%; height:100%; }
+  footer { grid-column:1 / 3; padding:0; overflow:hidden; border-radius:20px; border:1px solid var(--line); height:92px; background:var(--card); }
+  #status { position:absolute; right:12px; bottom:10px; font-size:16px; color:#3a475c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div id="time">--:--<small></small></div>
+    <div id="date"><b>--</b></div>
+  </header>
+
+  <section class="card" id="weather">
+    <div class="label" id="wPlace">Weather</div>
+    <div class="now">
+      <div id="wIcon">–</div>
+      <div id="wTemp">--°</div>
+      <div><div id="wDesc">Loading…</div><div id="wMeta"></div></div>
+    </div>
+    <div class="days" id="days"></div>
+  </section>
+
+  <section class="card" id="chart"></section>
+
+  <footer id="ticker"></footer>
+</div>
+<div id="status"></div>
+
+<script>
+/* ========= EDIT ME ========= */
+var CONFIG = {
+  place: "East Grand Forks, MN",
+  lat: 47.93, lon: -97.02,
+  timezone: "America/Chicago",
+  hour12: true,
+  units: "fahrenheit",            // "fahrenheit" or "celsius"
+  chartSymbol: "AMEX:SPY",        // main chart
+  tickers: [                      // scrolling tape (TradingView symbols)
+    {proName:"AMEX:SPY", title:"S&P 500"}, {proName:"NASDAQ:QQQ", title:"Nasdaq 100"},
+    {proName:"AMEX:DIA", title:"Dow"}, {proName:"AMEX:IWM", title:"Russell 2000"},
+    {proName:"TVC:VIX", title:"VIX"}, {proName:"TVC:US10Y", title:"10Y Yield"},
+    {proName:"NASDAQ:AAPL", title:"Apple"}, {proName:"NASDAQ:NVDA", title:"Nvidia"},
+    {proName:"NASDAQ:MSFT", title:"Microsoft"}, {proName:"BITSTAMP:BTCUSD", title:"Bitcoin"}
+  ],
+  weatherRefreshMin: 15
+};
+/* =========================== */
+
+function $(id){ return document.getElementById(id); }
+
+/* ---- clock ---- */
+function tick(){
+  var now = new Date();
+  var t = now.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:CONFIG.hour12,timeZone:CONFIG.timezone});
+  var parts = t.split(" ");
+  $("time").innerHTML = parts[0] + (parts[1] ? "<small>"+parts[1]+"</small>" : "");
+  $("date").innerHTML = "<b>"+now.toLocaleDateString("en-US",{weekday:"long",timeZone:CONFIG.timezone})+"</b>" +
+    now.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric",timeZone:CONFIG.timezone});
+}
+tick(); setInterval(tick, 1000);
+
+/* ---- weather (Open-Meteo, no API key) ---- */
+var WX = {0:["Clear","☀️"],1:["Mostly clear","🌤️"],2:["Partly cloudy","⛅"],3:["Overcast","☁️"],
+  45:["Fog","🌫️"],48:["Fog","🌫️"],51:["Light drizzle","🌦️"],53:["Drizzle","🌦️"],55:["Drizzle","🌦️"],
+  61:["Light rain","🌧️"],63:["Rain","🌧️"],65:["Heavy rain","🌧️"],66:["Freezing rain","🌧️"],67:["Freezing rain","🌧️"],
+  71:["Light snow","🌨️"],73:["Snow","❄️"],75:["Heavy snow","❄️"],77:["Snow grains","❄️"],
+  80:["Showers","🌦️"],81:["Showers","🌧️"],82:["Heavy showers","⛈️"],85:["Snow showers","🌨️"],86:["Snow showers","🌨️"],
+  95:["Thunderstorm","⛈️"],96:["Thunderstorm","⛈️"],99:["Thunderstorm","⛈️"]};
+function wx(c){ return WX[c] || ["—","•"]; }
+
+function loadWeather(){
+  var u = "https://api.open-meteo.com/v1/forecast?latitude="+CONFIG.lat+"&longitude="+CONFIG.lon+
+    "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"+
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5"+
+    "&temperature_unit="+CONFIG.units+"&wind_speed_unit=mph&timezone="+encodeURIComponent(CONFIG.timezone);
+  var x = new XMLHttpRequest();
+  x.open("GET", u); x.timeout = 15000;
+  x.onload = function(){
+    try {
+      var d = JSON.parse(x.responseText), c = d.current, w = wx(c.weather_code);
+      var deg = CONFIG.units === "fahrenheit" ? "°F" : "°C";
+      $("wPlace").textContent = CONFIG.place;
+      $("wIcon").textContent = w[1];
+      $("wTemp").textContent = Math.round(c.temperature_2m) + "°";
+      $("wDesc").textContent = w[0];
+      $("wMeta").textContent = "Feels like " + Math.round(c.apparent_temperature) + deg + "  ·  Wind " + Math.round(c.wind_speed_10m) + " mph";
+      var html = "";
+      for (var i=0;i<d.daily.time.length;i++){
+        var dt = new Date(d.daily.time[i] + "T12:00:00");
+        var name = i===0 ? "Today" : dt.toLocaleDateString("en-US",{weekday:"short"});
+        html += '<div class="day"><div class="d">'+name+'</div><div class="i">'+wx(d.daily.weather_code[i])[1]+
+          '</div><div class="t">'+Math.round(d.daily.temperature_2m_max[i])+'° <span>'+Math.round(d.daily.temperature_2m_min[i])+'°</span></div></div>';
+      }
+      $("days").innerHTML = html;
+      $("status").textContent = "";
+    } catch(e){ $("wDesc").textContent = "Weather unavailable"; }
+  };
+  x.onerror = x.ontimeout = function(){ $("wDesc").textContent = "Weather offline"; };
+  x.send();
+}
+loadWeather(); setInterval(loadWeather, CONFIG.weatherRefreshMin*60*1000);
+
+/* ---- TradingView widgets ---- */
+function tv(containerId, scriptName, cfg){
+  var box = document.createElement("div");
+  box.className = "tradingview-widget-container";
+  var inner = document.createElement("div");
+  inner.className = "tradingview-widget-container__widget";
+  box.appendChild(inner);
+  var s = document.createElement("script");
+  s.type = "text/javascript"; s.async = true;
+  s.src = "https://s3.tradingview.com/external-embedding/embed-widget-" + scriptName + ".js";
+  s.text = JSON.stringify(cfg);
+  box.appendChild(s);
+  $(containerId).appendChild(box);
+}
+tv("ticker", "ticker-tape", {
+  symbols: CONFIG.tickers, colorTheme: "dark", isTransparent: true, displayMode: "adaptive", locale: "en"
+});
+tv("chart", "advanced-chart", {
+  autosize: true, symbol: CONFIG.chartSymbol, interval: "D", timezone: CONFIG.timezone,
+  theme: "dark", style: "2", locale: "en", hide_top_toolbar: true, hide_legend: false,
+  hide_side_toolbar: true, allow_symbol_change: false, backgroundColor: "#131a26", gridColor: "rgba(0,0,0,0)"
+});
+
+/* ---- reload nightly to avoid stale/leaky long-running pages ---- */
+setInterval(function(){ var h=new Date().getHours(), m=new Date().getMinutes(); if(h===4&&m===0) location.reload(); }, 60000);
+
+/* ---- remote: Back/Return exits the app on Tizen ---- */
+document.addEventListener("keydown", function(e){
+  if (e.keyCode === 10009 && window.tizen && tizen.application) { tizen.application.getCurrentApplication().exit(); }
+  if (e.key === "r" || e.keyCode === 403) { location.reload(); }  // red button reloads
+});
+</script>
+</body>
+</html>
