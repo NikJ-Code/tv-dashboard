@@ -35,7 +35,7 @@
   #chart { grid-row:2; min-height:0; padding:0; overflow:hidden; }
   #chart .tradingview-widget-container { width:100%; height:100%; }
   footer { grid-column:1 / 3; padding:0; overflow:hidden; border-radius:20px; border:1px solid var(--line); height:92px; background:var(--card); }
-  #status { position:absolute; right:12px; bottom:10px; font-size:16px; color:#3a475c; }
+  #status { position:absolute; left:12px; top:8px; font:14px/1.3 monospace; color:#ffd24d; white-space:pre; z-index:9; text-align:left; }
 </style>
 </head>
 <body>
@@ -84,6 +84,7 @@ var CONFIG = {
 function $(id){ return document.getElementById(id); }
 
 /* ---- scale the 1920x1080 layout to whatever the TV browser reports (4K = 3840 wide) ---- */
+var T0 = Date.now(), LOG = [];
 function fit(){
   var w = window.innerWidth || 1920, hgt = window.innerHeight || 1080;
   var s = Math.min(w/1920, hgt/1080);
@@ -91,8 +92,14 @@ function fit(){
   st.style.transform = "scale(" + s + ")";
   st.style.left = Math.max(0,(w-1920*s)/2) + "px";
   st.style.top = Math.max(0,(hgt-1080*s)/2) + "px";
+  var line = ((Date.now()-T0)/1000).toFixed(1)+"s inner "+w+"x"+hgt+" client "+document.documentElement.clientWidth+
+    " dpr "+(window.devicePixelRatio||1)+" screen "+(screen&&screen.width)+" scale "+s.toFixed(2);
+  if (!LOG.length || LOG[LOG.length-1].split(" ").slice(1).join(" ") !== line.split(" ").slice(1).join(" ")) LOG.push(line);
+  if (Date.now()-T0 < 45000) $("status").textContent = "DEBUG (hides after 45s)\n" + LOG.slice(-8).join("\n");
+  else $("status").textContent = "";
 }
-fit(); window.addEventListener("resize", fit);
+fit(); window.addEventListener("resize", fit); window.addEventListener("load", fit);
+setInterval(fit, 500);
 
 /* ---- clock ---- */
 function tick(){
