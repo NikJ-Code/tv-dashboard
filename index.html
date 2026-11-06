@@ -5,37 +5,58 @@
 <title>TV Dashboard</title>
 <meta name="viewport" content="width=1920, initial-scale=1">
 <style>
-  :root { --bg:#0b0f17; --card:#131a26; --line:#212c3d; --text:#eef2f8; --dim:#8b98ad; --accent:#4da3ff; }
+  /*
+    Every size below is marked !important on purpose.
+    TizenPortal's "Text Scale" feature (on by default, level "medium") injects
+      div, span, p, ... { font-size: 1rem !important; line-height: ~1.46 !important }
+    after the page loads, which shrank the clock/temperature. ID/class selectors
+    with !important outrank its plain element selectors, so these always win.
+  */
+  :root { --bg:#0b0f17; --card:#131a26; --line:#212c3d; --text:#eef2f8; --dim:#8b98ad; --ice:#cfe3ff; }
   * { box-sizing:border-box; margin:0; padding:0; }
   html,body { width:100%; height:100%; background:var(--bg); color:var(--text);
     font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; overflow:hidden; }
-  /* 5% overscan-safe margins for TVs */
+
+  /* Fixed 1920x1080 canvas, scaled to the real screen width by fit() */
   #stage { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; }
-  .wrap { position:absolute; inset:54px 96px; display:grid;
+  /* 5% overscan-safe margins */
+  .wrap { position:absolute; top:54px; right:96px; bottom:54px; left:96px; display:grid;
     grid-template-columns: 1.1fr 1fr; grid-template-rows: auto 1fr auto; gap:32px; }
+  .wrap div { line-height:1.25 !important; letter-spacing:normal !important; }
+
   .card { background:var(--card); border:1px solid var(--line); border-radius:28px; padding:36px 44px; }
-  .label { font-size:22px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:18px; }
-  header { grid-column:1 / 3; display:flex; justify-content:space-between; align-items:flex-end; }
-  #time { font-size:150px; font-weight:200; line-height:1; letter-spacing:-.02em; }
-  #time small { font-size:48px; color:var(--dim); margin-left:14px; font-weight:300; }
-  #date { font-size:38px; color:var(--dim); text-align:right; padding-bottom:14px; }
-  #date b { display:block; color:var(--text); font-weight:400; font-size:44px; }
-  .now { display:flex; align-items:center; gap:36px; }
-  #wIcon { width:130px; height:130px; color:#cfe3ff; }
-  #wIcon svg { width:130px; height:130px; }
-  .day .i svg { width:54px; height:54px; }
-  #wTemp { font-size:120px; font-weight:200; line-height:1; }
-  #wDesc { font-size:36px; color:var(--text); margin-top:6px; }
-  #wMeta { font-size:26px; color:var(--dim); margin-top:6px; }
-  .days { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:34px; }
-  .day { background:#0f1520; border:1px solid var(--line); border-radius:20px; padding:20px 8px; text-align:center; }
-  .day .d { font-size:24px; color:var(--dim); }
-  .day .i { margin:8px 0; height:54px; display:flex; justify-content:center; color:#cfe3ff; }
-  .day .t { font-size:28px; } .day .t span { color:var(--dim); }
-  #chart { grid-row:2; min-height:0; padding:0; overflow:hidden; }
+  .label { font-size:22px !important; letter-spacing:.14em !important; text-transform:uppercase; color:var(--dim); margin-bottom:18px; }
+
+  header { grid-column:1 / 3; grid-row:1; display:flex; justify-content:space-between; align-items:flex-end; }
+  #time { font-size:150px !important; font-weight:200; line-height:1 !important; letter-spacing:-.02em !important; }
+  #time small { font-size:48px !important; color:var(--dim); margin-left:14px; font-weight:300; }
+  #date { font-size:38px !important; color:var(--dim); text-align:right; padding-bottom:14px; }
+  #date b { display:block; color:var(--text); font-weight:400; font-size:44px !important; }
+
+  #chart   { grid-column:1; grid-row:2; min-height:0; padding:0; overflow:hidden; }
   #chart .tradingview-widget-container { width:100%; height:100%; }
-  footer { grid-column:1 / 3; padding:0; overflow:hidden; border-radius:20px; border:1px solid var(--line); height:92px; background:var(--card); }
-  #status { position:absolute; left:12px; top:8px; font:14px/1.3 monospace; color:#ffd24d; background:rgba(0,0,0,.75); padding:6px 10px; white-space:pre; z-index:9; text-align:left; }
+  #weather { grid-column:2; grid-row:2; min-height:0; display:flex; flex-direction:column; }
+
+  .now { display:flex; align-items:center; gap:36px; }
+  #wIcon { width:130px; height:130px; color:var(--ice); flex:none; }
+  #wIcon svg { width:130px; height:130px; display:block; }
+  #wTemp { font-size:120px !important; font-weight:200; line-height:1 !important; }
+  #wDesc { font-size:36px !important; color:var(--text); margin-top:6px; }
+  #wMeta, #wWind { font-size:26px !important; color:var(--dim); margin-top:4px; white-space:nowrap; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:34px; }
+  .stat { border-top:1px solid var(--line); padding-top:16px; }
+  .stat .k { font-size:18px !important; letter-spacing:.12em !important; text-transform:uppercase; color:var(--dim); }
+  .stat .v { font-size:32px !important; margin-top:6px; white-space:nowrap; }
+
+  .days { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:auto; }
+  .day { background:#0f1520; border:1px solid var(--line); border-radius:20px; padding:22px 8px; text-align:center; }
+  .day .d { font-size:24px !important; color:var(--dim); }
+  .day .i { margin:10px 0; height:58px; display:flex; justify-content:center; color:var(--ice); }
+  .day .i svg { width:58px; height:58px; display:block; }
+  .day .t { font-size:28px !important; }
+  .day .t span { font-size:inherit !important; letter-spacing:normal !important; color:var(--dim); }
+
+  footer { grid-column:1 / 3; grid-row:3; overflow:hidden; border-radius:20px; border:1px solid var(--line); height:92px; background:var(--card); }
 </style>
 </head>
 <body>
@@ -45,21 +66,26 @@
     <div id="date"><b>--</b></div>
   </header>
 
+  <section class="card" id="chart"></section>
+
   <section class="card" id="weather">
     <div class="label" id="wPlace">Weather</div>
     <div class="now">
       <div id="wIcon"></div>
       <div id="wTemp">--°</div>
-      <div><div id="wDesc">Loading…</div><div id="wMeta"></div></div>
+      <div><div id="wDesc">Loading…</div><div id="wMeta"></div><div id="wWind" class="wmeta2"></div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">High / Low</div><div class="v" id="sHL">–</div></div>
+      <div class="stat"><div class="k">Precip</div><div class="v" id="sPop">–</div></div>
+      <div class="stat"><div class="k">Sunrise</div><div class="v" id="sRise">–</div></div>
+      <div class="stat"><div class="k">Sunset</div><div class="v" id="sSet">–</div></div>
     </div>
     <div class="days" id="days"></div>
   </section>
 
-  <section class="card" id="chart"></section>
-
   <footer id="ticker"></footer>
 </div></div>
-<div id="status"></div>
 
 <script>
 /* ========= EDIT ME ========= */
@@ -83,33 +109,26 @@ var CONFIG = {
 
 function $(id){ return document.getElementById(id); }
 
-/* ---- scale the 1920x1080 layout to whatever the TV browser reports (4K = 3840 wide) ---- */
-var T0 = Date.now(), LOG = [];
+/* ---- scale the 1920x1080 canvas by screen WIDTH only.
+   The TV briefly reports a bogus viewport height (seen: 568px), so height is ignored. ---- */
 function fit(){
-  var w = window.innerWidth || 1920, hgt = window.innerHeight || 1080;
-  var s = w/1920;   /* width only: the TV briefly reports a bogus viewport height */
+  var w = window.innerWidth || 1920;
+  var s = w / 1920;
   var st = $("stage");
   st.style.transform = "scale(" + s + ")";
-  st.style.left = Math.max(0,(w-1920*s)/2) + "px";
+  st.style.left = "0px";
   st.style.top = "0px";
-  var r = st.getBoundingClientRect();
-  var cs = function(el,p){ try { return getComputedStyle(el)[p]; } catch(e){ return "?"; } };
-  var line = ((Date.now()-T0)/1000).toFixed(1)+"s inner "+w+"x"+hgt+" dpr "+(window.devicePixelRatio||1)+" scale "+s.toFixed(2)+
-    "\n   stageW "+Math.round(r.width)+" clockPx "+cs($("time"),"fontSize")+" zoom "+cs(document.documentElement,"zoom")+
-    " vv "+(window.visualViewport?window.visualViewport.scale:"-");
-  st.style.outline = (Date.now()-T0 < 45000) ? "6px solid #00e5ff" : "none"; st.style.outlineOffset = "-6px";
-  if (!LOG.length || LOG[LOG.length-1].replace(/^\S+/,"") !== line.replace(/^\S+/,"")) LOG.push(line);
-  if (Date.now()-T0 < 45000) $("status").textContent = "DEBUG (hides after 45s)\n" + LOG.slice(-4).join("\n");
-  else $("status").textContent = "";
 }
-fit(); window.addEventListener("resize", fit); window.addEventListener("load", fit);
-setInterval(fit, 500);
+fit();
+window.addEventListener("resize", fit);
+window.addEventListener("load", fit);
+setInterval(fit, 5000);
 
 /* ---- clock ---- */
 function tick(){
   var now = new Date();
   var t = now.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:CONFIG.hour12,timeZone:CONFIG.timezone});
-  var parts = t.split(" ");
+  var parts = t.split(/\s+/);   // newer browsers put a narrow no-break space before AM/PM
   $("time").innerHTML = parts[0] + (parts[1] ? "<small>"+parts[1]+"</small>" : "");
   $("date").innerHTML = "<b>"+now.toLocaleDateString("en-US",{weekday:"long",timeZone:CONFIG.timezone})+"</b>" +
     now.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric",timeZone:CONFIG.timezone});
@@ -136,12 +155,18 @@ function icon(k){
   if(k==="storm") return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><path d="M34 38l-7 11h8l-5 10" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>');
   return svg(CLOUD);
 }
+function hm(s){
+  if (!s || s.length < 16) return "–";
+  var H = +s.substr(11,2), M = s.substr(14,2);
+  if (!CONFIG.hour12) return (H<10?"0":"")+H+":"+M;
+  return ((H%12)||12) + ":" + M + (H<12 ? " AM" : " PM");
+}
 function wx(c){ return WX[c] || ["—","cloud"]; }
 
 function loadWeather(){
   var u = "https://api.open-meteo.com/v1/forecast?latitude="+CONFIG.lat+"&longitude="+CONFIG.lon+
     "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"+
-    "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5"+
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=5"+
     "&temperature_unit="+CONFIG.units+"&wind_speed_unit=mph&timezone="+encodeURIComponent(CONFIG.timezone);
   var x = new XMLHttpRequest();
   x.open("GET", u); x.timeout = 15000;
@@ -153,7 +178,13 @@ function loadWeather(){
       $("wIcon").innerHTML = icon(w[1]);
       $("wTemp").textContent = Math.round(c.temperature_2m) + "°";
       $("wDesc").textContent = w[0];
-      $("wMeta").textContent = "Feels like " + Math.round(c.apparent_temperature) + deg + "  ·  Wind " + Math.round(c.wind_speed_10m) + " mph";
+      $("wMeta").textContent = "Feels like " + Math.round(c.apparent_temperature) + deg;
+      $("wWind").textContent = "Wind " + Math.round(c.wind_speed_10m) + " mph";
+      var dd = d.daily;
+      $("sHL").textContent = Math.round(dd.temperature_2m_max[0]) + "° / " + Math.round(dd.temperature_2m_min[0]) + "°";
+      $("sPop").textContent = (dd.precipitation_probability_max && dd.precipitation_probability_max[0] != null) ? dd.precipitation_probability_max[0] + "%" : "–";
+      $("sRise").textContent = hm(dd.sunrise && dd.sunrise[0]);
+      $("sSet").textContent = hm(dd.sunset && dd.sunset[0]);
       var html = "";
       for (var i=0;i<d.daily.time.length;i++){
         var dt = new Date(d.daily.time[i] + "T12:00:00");
@@ -162,7 +193,6 @@ function loadWeather(){
           '</div><div class="t">'+Math.round(d.daily.temperature_2m_max[i])+'° <span>'+Math.round(d.daily.temperature_2m_min[i])+'°</span></div></div>';
       }
       $("days").innerHTML = html;
-      $("status").textContent = "";
     } catch(e){ $("wDesc").textContent = "Weather unavailable"; }
   };
   x.onerror = x.ontimeout = function(){ $("wDesc").textContent = "Weather offline"; };
@@ -193,13 +223,12 @@ tv("chart", "advanced-chart", {
   hide_side_toolbar: true, allow_symbol_change: false, backgroundColor: "#131a26", gridColor: "rgba(0,0,0,0)"
 });
 
-/* ---- reload nightly to avoid stale/leaky long-running pages ---- */
-setInterval(function(){ var h=new Date().getHours(), m=new Date().getMinutes(); if(h===4&&m===0) location.reload(); }, 60000);
+/* ---- reload nightly to keep a long-running page fresh ---- */
+setInterval(function(){ var n=new Date(); if(n.getHours()===4 && n.getMinutes()===0) location.reload(); }, 60000);
 
-/* ---- remote: Back/Return exits the app on Tizen ---- */
+/* ---- remote: red button reloads ---- */
 document.addEventListener("keydown", function(e){
-  if (e.keyCode === 10009 && window.tizen && tizen.application) { tizen.application.getCurrentApplication().exit(); }
-  if (e.key === "r" || e.keyCode === 403) { location.reload(); }  // red button reloads
+  if (e.keyCode === 403 || e.key === "r") { location.reload(); }
 });
 </script>
 </body>
