@@ -4,201 +4,452 @@
 <meta charset="utf-8">
 <title>TV Dashboard</title>
 <meta name="viewport" content="width=1920, initial-scale=1">
+<script>
+  /* When TizenBrew serves this file through jsDelivr (127.0.0.1), jump to the live
+     GitHub Pages copy so future edits show up within a minute instead of being cached for hours. */
+  (function(){
+    var LIVE = "https://nikj-code.github.io/tv-dashboard/";
+    if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+      location.replace(LIVE + "?t=" + Date.now());
+    }
+  })();
+</script>
 <style>
   /*
-    Every size below is marked !important on purpose.
-    TizenPortal's "Text Scale" feature (on by default, level "medium") injects
-      div, span, p, ... { font-size: 1rem !important; line-height: ~1.46 !important }
-    after the page loads, which shrank the clock/temperature. ID/class selectors
-    with !important outrank its plain element selectors, so these always win.
+    Sizes are "#stage ..." + !important on purpose: TizenPortal's Text Scale feature injects
+    div/span/p { font-size:1rem !important; line-height:1.46 !important } after load.
+    ID-prefixed !important rules outrank it, so the layout can't be shrunk.
   */
-  :root { --bg:#0b0f17; --card:#131a26; --line:#212c3d; --text:#eef2f8; --dim:#8b98ad; --ice:#cfe3ff; }
+  :root { --bg:#070b12; --card:rgba(20,28,42,.72); --line:rgba(120,150,190,.14); --text:#eef3fa; --dim:#8593a9;
+          --ice:#cfe3ff; --accent:#5aa9ff; --up:#3ddc97; --down:#ff6b81; --warn:#ffb547; }
   * { box-sizing:border-box; margin:0; padding:0; }
   html,body { width:100%; height:100%; background:var(--bg); color:var(--text);
-    font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; overflow:hidden; }
+    font-family:"Samsung One","SamsungOne","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; overflow:hidden; }
 
   /* Fixed 1920x1080 canvas, scaled to the real screen width by fit() */
-  #stage { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; }
-  /* 5% overscan-safe margins */
-  .wrap { position:absolute; top:54px; right:96px; bottom:54px; left:96px; display:grid;
-    grid-template-columns: 1.1fr 1fr; grid-template-rows: auto 1fr auto; gap:32px; }
-  .wrap div { line-height:1.25 !important; letter-spacing:normal !important; }
+  #stage { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; overflow:hidden;
+    background:
+      radial-gradient(900px 600px at 8% -10%, rgba(64,120,255,.22), transparent 60%),
+      radial-gradient(800px 700px at 105% 110%, rgba(140,80,255,.16), transparent 60%),
+      var(--bg); }
+  #stage .wrap { position:absolute; top:44px; right:84px; bottom:40px; left:84px; display:grid;
+    grid-template-columns: 1.12fr 1fr; grid-template-rows: auto 1fr 62px 62px; gap:20px 24px; }
+  #stage div, #stage span { line-height:1.25 !important; letter-spacing:normal !important; }
 
-  .card { background:var(--card); border:1px solid var(--line); border-radius:28px; padding:36px 44px; }
-  .label { font-size:22px !important; letter-spacing:.14em !important; text-transform:uppercase; color:var(--dim); margin-bottom:18px; }
+  #stage .card { background:var(--card); border:1px solid var(--line); border-radius:26px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }
+  #stage .label { font-size:19px !important; letter-spacing:.16em !important; text-transform:uppercase; color:var(--dim); font-weight:600; }
 
-  header { grid-column:1 / 3; grid-row:1; display:flex; justify-content:space-between; align-items:flex-end; }
-  #time { font-size:150px !important; font-weight:200; line-height:1 !important; letter-spacing:-.02em !important; }
-  #time small { font-size:48px !important; color:var(--dim); margin-left:14px; font-weight:300; }
-  #date { font-size:38px !important; color:var(--dim); text-align:right; padding-bottom:14px; }
-  #date b { display:block; color:var(--text); font-weight:400; font-size:44px !important; }
+  /* ---------- header ---------- */
+  #stage header { grid-column:1 / 3; grid-row:1; display:flex; align-items:flex-end; justify-content:space-between; }
+  #stage #time { font-size:138px !important; font-weight:200; line-height:.95 !important; letter-spacing:-.03em !important; }
+  #stage #time small { font-size:42px !important; color:var(--dim); margin-left:12px; font-weight:300; letter-spacing:0 !important; }
+  #stage #greet { font-size:30px !important; color:var(--dim); margin-top:10px; font-weight:300; }
+  #stage .hcenter { display:flex; flex-direction:column; align-items:center; gap:12px; padding-bottom:12px; }
+  #stage #mkt { display:flex; align-items:center; gap:14px; padding:12px 24px; border-radius:999px;
+    background:var(--card); border:1px solid var(--line); font-size:24px !important; }
+  #stage #mkt .dot { width:14px; height:14px; border-radius:50%; background:var(--dim); flex:none; }
+  #stage #mkt.open .dot { background:var(--up); box-shadow:0 0 0 0 rgba(61,220,151,.6); animation:pulse 2s infinite; }
+  #stage #mkt.ext .dot { background:var(--warn); }
+  #stage #mkt b { font-weight:600; font-size:24px !important; }
+  #stage #mkt span { font-size:24px !important; color:var(--dim); }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(61,220,151,.55)} 70%{box-shadow:0 0 0 14px rgba(61,220,151,0)} 100%{box-shadow:0 0 0 0 rgba(61,220,151,0)} }
+  #stage #date { text-align:right; padding-bottom:12px; font-size:34px !important; color:var(--dim); }
+  #stage #date b { display:block; color:var(--text); font-weight:500; font-size:44px !important; }
 
-  #chart   { grid-column:1; grid-row:2; min-height:0; padding:0; overflow:hidden; }
-  #chart .tradingview-widget-container { width:100%; height:100%; }
-  #weather { grid-column:2; grid-row:2; min-height:0; display:flex; flex-direction:column; }
+  /* ---------- chart ---------- */
+  #stage #chart { grid-column:1; grid-row:2; min-height:0; overflow:hidden; padding:0; }
+  #stage #chart .tradingview-widget-container { width:100%; height:100%; }
 
-  .now { display:flex; align-items:center; gap:36px; }
-  #wIcon { width:130px; height:130px; color:var(--ice); flex:none; }
-  #wIcon svg { width:130px; height:130px; display:block; }
-  #wTemp { font-size:120px !important; font-weight:200; line-height:1 !important; }
-  #wDesc { font-size:36px !important; color:var(--text); margin-top:6px; }
-  #wMeta, #wWind { font-size:26px !important; color:var(--dim); margin-top:4px; white-space:nowrap; }
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:34px; }
-  .stat { border-top:1px solid var(--line); padding-top:16px; }
-  .stat .k { font-size:18px !important; letter-spacing:.12em !important; text-transform:uppercase; color:var(--dim); }
-  .stat .v { font-size:32px !important; margin-top:6px; white-space:nowrap; }
+  /* ---------- right column ---------- */
+  #stage .rcol { grid-column:2; grid-row:2; min-height:0; display:flex; flex-direction:column; gap:20px; }
 
-  .days { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:auto; }
-  .day { background:#0f1520; border:1px solid var(--line); border-radius:20px; padding:22px 8px; text-align:center; }
-  .day .d { font-size:24px !important; color:var(--dim); }
-  .day .i { margin:10px 0; height:58px; display:flex; justify-content:center; color:var(--ice); }
-  .day .i svg { width:58px; height:58px; display:block; }
-  .day .t { font-size:28px !important; }
-  .day .t span { font-size:inherit !important; letter-spacing:normal !important; color:var(--dim); }
+  #stage #weather { padding:22px 32px 20px; flex:none; }
+  #stage .whead { display:flex; justify-content:space-between; align-items:center; min-height:30px; }
+  #stage #alert { display:none; align-items:center; gap:10px; padding:6px 16px; border-radius:999px;
+    background:rgba(255,107,129,.16); border:1px solid rgba(255,107,129,.45); color:#ffc2cc; font-size:19px !important; font-weight:600; max-width:470px; }
+  #stage #alert svg { width:20px; height:20px; flex:none; }
+  #stage #alert span { font-size:19px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #stage .wmain { display:flex; align-items:center; gap:24px; margin-top:10px; }
+  #stage #wIcon { width:104px; height:104px; color:var(--ice); flex:none; }
+  #stage #wIcon svg { width:104px; height:104px; display:block; }
+  #stage #wTemp { font-size:104px !important; font-weight:200; line-height:1 !important; letter-spacing:-.03em !important; }
+  #stage .wtext { flex:1; min-width:0; }
+  #stage #wDesc { font-size:32px !important; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #stage #wMeta, #stage #wWind { font-size:23px !important; color:var(--dim); margin-top:3px; white-space:nowrap; }
+  #stage .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px 22px; flex:none; }
+  #stage .stat .k { font-size:15px !important; letter-spacing:.14em !important; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  #stage .stat .v { font-size:26px !important; margin-top:2px; white-space:nowrap; }
+  #stage .days { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-top:16px; }
+  #stage .day { background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:18px; padding:10px 6px 8px; text-align:center; }
+  #stage .day .d { font-size:20px !important; color:var(--dim); font-weight:600; }
+  #stage .day .i { margin:6px 0; height:42px; display:flex; justify-content:center; color:var(--ice); }
+  #stage .day .i svg { width:42px; height:42px; display:block; }
+  #stage .day .t { font-size:23px !important; }
+  #stage .day .t span { font-size:inherit !important; color:var(--dim); }
+  #stage .day .p { font-size:16px !important; color:var(--accent); margin-top:2px; min-height:20px; }
 
-  footer { grid-column:1 / 3; grid-row:3; overflow:hidden; border-radius:20px; border:1px solid var(--line); height:92px; background:var(--card); }
+  /* top stories */
+  #stage #stories { flex:1; min-height:0; padding:22px 32px 20px; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+  #stage .shead { display:flex; justify-content:space-between; align-items:center; }
+  #stage #sMeta { font-size:19px !important; color:var(--accent); font-weight:600; }
+  #stage #sBody { flex:1; min-height:0; margin-top:10px; overflow:hidden; transition:opacity .6s ease; }
+  #stage #sBody.fade { opacity:0; }
+  #stage #sTitle { font-size:31px !important; font-weight:600; line-height:1.2 !important;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  #stage #sSum { font-size:21px !important; color:#b3bfd1; margin-top:8px; line-height:1.35 !important;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  #stage .sbar { height:4px; border-radius:4px; background:rgba(255,255,255,.07); overflow:hidden; flex:none; margin-top:12px; }
+  #stage #sProg { height:100%; width:0; background:linear-gradient(90deg,var(--accent),#9a7bff); }
+  #stage #stories .tradingview-widget-container { position:absolute; inset:64px 10px 10px; }
+
+  /* ---------- markets tape ---------- */
+  #stage #ticker { grid-column:1 / 3; grid-row:3; overflow:hidden; display:flex; align-items:center; padding:0 8px; }
+  #stage #ticker .tradingview-widget-container { width:100%; }
+
+  /* ---------- headline crawl ---------- */
+  #stage #crawl { grid-column:1 / 3; grid-row:4; display:flex; align-items:center; overflow:hidden; }
+  #stage .badge { flex:none; height:100%; display:flex; align-items:center; gap:10px; padding:0 22px;
+    background:linear-gradient(90deg,#e5484d,#c2343a); border-radius:26px 0 0 26px;
+    font-size:20px !important; font-weight:700; letter-spacing:.14em !important; color:#fff; }
+  #stage .badge i { width:10px; height:10px; border-radius:50%; background:#fff; animation:blink 1.6s infinite; }
+  @keyframes blink { 50%{opacity:.25} }
+  #stage .lane { flex:1; height:100%; overflow:hidden; position:relative;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
+            mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent); }
+  #stage #track { position:absolute; top:0; left:0; height:100%; display:flex; align-items:center; white-space:nowrap; padding-left:34px;
+    font-size:26px !important; will-change:transform; }
+  #stage #track span { font-size:inherit !important; }
+  #stage #track .src { font-size:17px !important; font-weight:700; letter-spacing:.12em !important; color:var(--accent);
+    padding:4px 10px; border:1px solid rgba(90,169,255,.4); border-radius:8px; margin:0 14px 0 0; }
+  #stage #track .sep { color:#3b4a61; margin:0 30px; }
+  @keyframes crawl { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+  /* ---------- night mode ---------- */
+  #night { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity 4s ease; z-index:50; }
 </style>
 </head>
 <body>
-<div id="stage"><div class="wrap">
-  <header>
-    <div id="time">--:--<small></small></div>
-    <div id="date"><b>--</b></div>
-  </header>
+<div id="stage">
+  <div class="wrap">
+    <header>
+      <div>
+        <div id="time">--:--<small></small></div>
+        <div id="greet">&nbsp;</div>
+      </div>
+      <div class="hcenter">
+        <div id="mkt"><i class="dot"></i><b id="mktState">Markets</b><span id="mktNext"></span></div>
+      </div>
+      <div id="date"><b>--</b></div>
+    </header>
 
-  <section class="card" id="chart"></section>
+    <section class="card" id="chart"></section>
 
-  <section class="card" id="weather">
-    <div class="label" id="wPlace">Weather</div>
-    <div class="now">
-      <div id="wIcon"></div>
-      <div id="wTemp">--°</div>
-      <div><div id="wDesc">Loading…</div><div id="wMeta"></div><div id="wWind" class="wmeta2"></div></div>
+    <div class="rcol">
+      <section class="card" id="weather">
+        <div class="whead">
+          <div class="label" id="wPlace">Weather</div>
+          <div id="alert"><svg viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v5M12 18v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span id="alertText"></span></div>
+        </div>
+        <div class="wmain">
+          <div id="wIcon"></div>
+          <div id="wTemp">--°</div>
+          <div class="wtext"><div id="wDesc">Loading…</div><div id="wMeta"></div><div id="wWind"></div></div>
+          <div class="stats">
+            <div class="stat"><div class="k">High / Low</div><div class="v" id="sHL">–</div></div>
+            <div class="stat"><div class="k">Precip</div><div class="v" id="sPop">–</div></div>
+            <div class="stat"><div class="k">Sunrise</div><div class="v" id="sRise">–</div></div>
+            <div class="stat"><div class="k">Sunset</div><div class="v" id="sSet">–</div></div>
+          </div>
+        </div>
+        <div class="days" id="days"></div>
+      </section>
+
+      <section class="card" id="stories">
+        <div class="shead"><div class="label">Top Stories</div><div id="sMeta"></div></div>
+        <div id="sBody"><div id="sTitle">Loading headlines…</div><div id="sSum"></div></div>
+        <div class="sbar"><div id="sProg"></div></div>
+      </section>
     </div>
-    <div class="stats">
-      <div class="stat"><div class="k">High / Low</div><div class="v" id="sHL">–</div></div>
-      <div class="stat"><div class="k">Precip</div><div class="v" id="sPop">–</div></div>
-      <div class="stat"><div class="k">Sunrise</div><div class="v" id="sRise">–</div></div>
-      <div class="stat"><div class="k">Sunset</div><div class="v" id="sSet">–</div></div>
-    </div>
-    <div class="days" id="days"></div>
-  </section>
 
-  <footer id="ticker"></footer>
-</div></div>
+    <section class="card" id="ticker"></section>
+
+    <section class="card" id="crawl">
+      <div class="badge"><i></i>HEADLINES</div>
+      <div class="lane"><div id="track"></div></div>
+    </section>
+  </div>
+  <div id="night"></div>
+</div>
 
 <script>
-/* ========= EDIT ME ========= */
+/* ========================= EDIT ME ========================= */
 var CONFIG = {
+  name: "Nikolas",                       // greeting; set to "" to hide the name
   place: "East Grand Forks, MN",
   lat: 47.93, lon: -97.02,
   timezone: "America/Chicago",
   hour12: true,
-  units: "fahrenheit",            // "fahrenheit" or "celsius"
-  chartSymbol: "AMEX:SPY",        // main chart
-  tickers: [                      // scrolling tape (TradingView symbols)
+  units: "fahrenheit",                   // "fahrenheit" or "celsius"
+  chartSymbol: "AMEX:SPY",
+  tickers: [
     {proName:"AMEX:SPY", title:"S&P 500"}, {proName:"NASDAQ:QQQ", title:"Nasdaq 100"},
     {proName:"AMEX:DIA", title:"Dow"}, {proName:"AMEX:IWM", title:"Russell 2000"},
-    {proName:"TVC:VIX", title:"VIX"}, {proName:"TVC:US10Y", title:"10Y Yield"},
+    {proName:"NASDAQ:TLT", title:"20Y Treasuries"}, {proName:"AMEX:GLD", title:"Gold"},
     {proName:"NASDAQ:AAPL", title:"Apple"}, {proName:"NASDAQ:NVDA", title:"Nvidia"},
     {proName:"NASDAQ:MSFT", title:"Microsoft"}, {proName:"BITSTAMP:BTCUSD", title:"Bitcoin"}
   ],
-  weatherRefreshMin: 15
+  newsFeeds: [
+    {name:"CNBC", url:"https://www.cnbc.com/id/100003114/device/rss/rss.html"},
+    {name:"NPR",  url:"https://feeds.npr.org/1001/rss.xml"},
+    {name:"BBC",  url:"https://feeds.bbci.co.uk/news/world/rss.xml"},
+    {name:"YAHOO FIN", url:"https://finance.yahoo.com/news/rssindex"}
+  ],
+  storySeconds: 12,                      // how long each top story stays up
+  crawlSpeed: 85,                        // headline crawl speed, pixels per second
+  nightStart: 23, nightEnd: 6, nightDim: 0.65,   // dim the screen overnight (set nightDim 0 to disable)
+  weatherRefreshMin: 15, newsRefreshMin: 15
 };
-/* =========================== */
+/* =========================================================== */
 
 function $(id){ return document.getElementById(id); }
+function pad(n){ return (n<10?"0":"")+n; }
 
-/* ---- scale the 1920x1080 canvas by screen WIDTH only.
-   The TV briefly reports a bogus viewport height (seen: 568px), so height is ignored. ---- */
-function fit(){
-  var w = window.innerWidth || 1920;
-  var s = w / 1920;
-  var st = $("stage");
-  st.style.transform = "scale(" + s + ")";
-  st.style.left = "0px";
-  st.style.top = "0px";
+/* ---- scale the canvas by screen WIDTH only (the TV briefly reports a bogus height) ---- */
+function fit(){ $("stage").style.transform = "scale(" + ((window.innerWidth || 1920) / 1920) + ")"; }
+fit(); window.addEventListener("resize", fit); window.addEventListener("load", fit); setInterval(fit, 5000);
+
+/* ---- small XHR helpers ---- */
+function get(url, ok, fail, timeout){
+  var x = new XMLHttpRequest();
+  try { x.open("GET", url); } catch(e){ fail && fail(); return; }
+  x.timeout = timeout || 15000;
+  x.onload = function(){ if (x.status >= 200 && x.status < 300) ok(x.responseText); else fail && fail(); };
+  x.onerror = x.ontimeout = function(){ fail && fail(); };
+  x.send();
 }
-fit();
-window.addEventListener("resize", fit);
-window.addEventListener("load", fit);
-setInterval(fit, 5000);
 
-/* ---- clock ---- */
+/* ---- clock, greeting, date ---- */
+function zoned(tz){ return new Date(new Date().toLocaleString("en-US",{timeZone:tz})); }
 function tick(){
   var now = new Date();
   var t = now.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:CONFIG.hour12,timeZone:CONFIG.timezone});
-  var parts = t.split(/\s+/);   // newer browsers put a narrow no-break space before AM/PM
+  var parts = t.split(/\s+/);
   $("time").innerHTML = parts[0] + (parts[1] ? "<small>"+parts[1]+"</small>" : "");
   $("date").innerHTML = "<b>"+now.toLocaleDateString("en-US",{weekday:"long",timeZone:CONFIG.timezone})+"</b>" +
     now.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric",timeZone:CONFIG.timezone});
+  var h = zoned(CONFIG.timezone).getHours();
+  var g = h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  $("greet").textContent = g + (CONFIG.name ? ", " + CONFIG.name : "");
+  var dim = CONFIG.nightDim && (CONFIG.nightStart > CONFIG.nightEnd ? (h >= CONFIG.nightStart || h < CONFIG.nightEnd) : (h >= CONFIG.nightStart && h < CONFIG.nightEnd));
+  $("night").style.opacity = dim ? CONFIG.nightDim : 0;
+  marketStatus();
+}
+
+/* ---- US market session (NYSE hours, Eastern time; does not know exchange holidays) ---- */
+function dur(min){ var h = Math.floor(min/60), m = min%60; return (h ? h+"h " : "") + m + "m"; }
+function marketStatus(){
+  var et = zoned("America/New_York"), d = et.getDay(), m = et.getHours()*60 + et.getMinutes();
+  var OPEN = 570, CLOSE = 960, PRE = 240, POST = 1200, el = $("mkt"), st, nx;
+  var weekday = d >= 1 && d <= 5;
+  function untilOpen(){
+    var days = 0, dd = d;
+    if (weekday && m < OPEN) return dur(OPEN - m);
+    do { dd = (dd+1)%7; days++; } while (dd === 0 || dd === 6);
+    return dur(days*1440 - m + OPEN);
+  }
+  if (weekday && m >= OPEN && m < CLOSE)      { el.className="open"; st="Market open";  nx="closes in " + dur(CLOSE - m); }
+  else if (weekday && m >= PRE && m < OPEN)   { el.className="ext";  st="Pre-market";   nx="opens in " + dur(OPEN - m); }
+  else if (weekday && m >= CLOSE && m < POST) { el.className="ext";  st="After hours";  nx="next open in " + untilOpen(); }
+  else                                         { el.className="";     st="Market closed"; nx="opens in " + untilOpen(); }
+  $("mktState").textContent = st; $("mktNext").textContent = "· " + nx;
 }
 tick(); setInterval(tick, 1000);
 
-/* ---- weather (Open-Meteo, no API key) ---- */
+/* ---- weather icons (drawn, so they render on any TV font) ---- */
 var WX = {0:["Clear","sun"],1:["Mostly clear","sun"],2:["Partly cloudy","part"],3:["Overcast","cloud"],
   45:["Fog","fog"],48:["Fog","fog"],51:["Light drizzle","rain"],53:["Drizzle","rain"],55:["Drizzle","rain"],
+  56:["Freezing drizzle","rain"],57:["Freezing drizzle","rain"],
   61:["Light rain","rain"],63:["Rain","rain"],65:["Heavy rain","rain"],66:["Freezing rain","rain"],67:["Freezing rain","rain"],
   71:["Light snow","snow"],73:["Snow","snow"],75:["Heavy snow","snow"],77:["Snow grains","snow"],
   80:["Showers","rain"],81:["Showers","rain"],82:["Heavy showers","storm"],85:["Snow showers","snow"],86:["Snow showers","snow"],
   95:["Thunderstorm","storm"],96:["Thunderstorm","storm"],99:["Thunderstorm","storm"]};
 var CLOUD = '<path d="M17 38h26a9 9 0 0 0 1-17.9A12 12 0 0 0 21 23a8 8 0 0 0-4 15z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>';
 var SUN = '<circle cx="32" cy="32" r="9" fill="none" stroke="currentColor" stroke-width="3"/><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M32 10v6M32 48v6M10 32h6M48 32h6M16.5 16.5l4 4M43.5 43.5l4 4M16.5 47.5l4-4M43.5 20.5l4-4"/></g>';
+var MOON = '<path d="M40 14a18 18 0 1 0 12 30A16 16 0 0 1 40 14z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>';
 function svg(inner){ return '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">'+inner+'</svg>'; }
-function icon(k){
-  if(k==="sun") return svg(SUN);
-  if(k==="part") return svg('<g transform="scale(.6)">'+SUN+'</g><g transform="translate(10,14) scale(.85)">'+CLOUD+'</g>');
+function icon(k, night){
+  if(k==="sun")   return svg(night ? MOON : SUN);
+  if(k==="part")  return svg('<g transform="scale(.6)">'+(night?MOON:SUN)+'</g><g transform="translate(10,14) scale(.85)">'+CLOUD+'</g>');
   if(k==="cloud") return svg('<g transform="translate(0,6)">'+CLOUD+'</g>');
-  if(k==="fog") return svg('<g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 24h40M8 34h44M14 44h38"/></g>');
-  if(k==="rain") return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M22 46l-3 8M33 46l-3 8M44 46l-3 8"/></g>');
-  if(k==="snow") return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><g fill="currentColor"><circle cx="21" cy="50" r="2.5"/><circle cx="32" cy="54" r="2.5"/><circle cx="43" cy="50" r="2.5"/></g>');
+  if(k==="fog")   return svg('<g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 24h40M8 34h44M14 44h38"/></g>');
+  if(k==="rain")  return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M22 46l-3 8M33 46l-3 8M44 46l-3 8"/></g>');
+  if(k==="snow")  return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><g fill="currentColor"><circle cx="21" cy="50" r="2.5"/><circle cx="32" cy="54" r="2.5"/><circle cx="43" cy="50" r="2.5"/></g>');
   if(k==="storm") return svg('<g transform="translate(0,-4)">'+CLOUD+'</g><path d="M34 38l-7 11h8l-5 10" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>');
   return svg(CLOUD);
 }
-function hm(s){
+function wx(c){ return WX[c] || ["—","cloud"]; }
+function hm(s){   // "2026-11-06T07:32" (already local) -> "7:32 AM"
   if (!s || s.length < 16) return "–";
   var H = +s.substr(11,2), M = s.substr(14,2);
-  if (!CONFIG.hour12) return (H<10?"0":"")+H+":"+M;
-  return ((H%12)||12) + ":" + M + (H<12 ? " AM" : " PM");
+  return CONFIG.hour12 ? ((H%12)||12) + ":" + M + (H<12 ? " AM" : " PM") : pad(H)+":"+M;
 }
-function wx(c){ return WX[c] || ["—","cloud"]; }
 
+/* ---- weather (Open-Meteo, no key) ---- */
 function loadWeather(){
   var u = "https://api.open-meteo.com/v1/forecast?latitude="+CONFIG.lat+"&longitude="+CONFIG.lon+
-    "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"+
+    "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day"+
     "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=5"+
     "&temperature_unit="+CONFIG.units+"&wind_speed_unit=mph&timezone="+encodeURIComponent(CONFIG.timezone);
-  var x = new XMLHttpRequest();
-  x.open("GET", u); x.timeout = 15000;
-  x.onload = function(){
+  get(u, function(txt){
     try {
-      var d = JSON.parse(x.responseText), c = d.current, w = wx(c.weather_code);
+      var d = JSON.parse(txt), c = d.current, w = wx(c.weather_code), dd = d.daily;
       var deg = CONFIG.units === "fahrenheit" ? "°F" : "°C";
       $("wPlace").textContent = CONFIG.place;
-      $("wIcon").innerHTML = icon(w[1]);
+      $("wIcon").innerHTML = icon(w[1], c.is_day === 0);
       $("wTemp").textContent = Math.round(c.temperature_2m) + "°";
       $("wDesc").textContent = w[0];
       $("wMeta").textContent = "Feels like " + Math.round(c.apparent_temperature) + deg;
       $("wWind").textContent = "Wind " + Math.round(c.wind_speed_10m) + " mph";
-      var dd = d.daily;
       $("sHL").textContent = Math.round(dd.temperature_2m_max[0]) + "° / " + Math.round(dd.temperature_2m_min[0]) + "°";
-      $("sPop").textContent = (dd.precipitation_probability_max && dd.precipitation_probability_max[0] != null) ? dd.precipitation_probability_max[0] + "%" : "–";
+      var pop = dd.precipitation_probability_max || [];
+      $("sPop").textContent = pop[0] != null ? pop[0] + "%" : "–";
       $("sRise").textContent = hm(dd.sunrise && dd.sunrise[0]);
       $("sSet").textContent = hm(dd.sunset && dd.sunset[0]);
       var html = "";
-      for (var i=0;i<d.daily.time.length;i++){
-        var dt = new Date(d.daily.time[i] + "T12:00:00");
+      for (var i=0;i<dd.time.length;i++){
+        var dt = new Date(dd.time[i] + "T12:00:00");
         var name = i===0 ? "Today" : dt.toLocaleDateString("en-US",{weekday:"short"});
-        html += '<div class="day"><div class="d">'+name+'</div><div class="i">'+icon(wx(d.daily.weather_code[i])[1])+
-          '</div><div class="t">'+Math.round(d.daily.temperature_2m_max[i])+'° <span>'+Math.round(d.daily.temperature_2m_min[i])+'°</span></div></div>';
+        html += '<div class="day"><div class="d">'+name+'</div><div class="i">'+icon(wx(dd.weather_code[i])[1])+
+          '</div><div class="t">'+Math.round(dd.temperature_2m_max[i])+'° <span>'+Math.round(dd.temperature_2m_min[i])+'°</span></div>'+
+          '<div class="p">'+(pop[i] >= 20 ? pop[i]+'% precip' : '')+'</div></div>';
       }
       $("days").innerHTML = html;
     } catch(e){ $("wDesc").textContent = "Weather unavailable"; }
-  };
-  x.onerror = x.ontimeout = function(){ $("wDesc").textContent = "Weather offline"; };
-  x.send();
+  }, function(){ $("wDesc").textContent = "Weather offline"; });
 }
-loadWeather(); setInterval(loadWeather, CONFIG.weatherRefreshMin*60*1000);
+
+/* ---- National Weather Service alerts (blizzard, wind chill, flood...) ---- */
+function loadAlerts(){
+  get("https://api.weather.gov/alerts/active?point="+CONFIG.lat+","+CONFIG.lon, function(txt){
+    try {
+      var f = (JSON.parse(txt).features || []).map(function(x){ return x.properties; });
+      var rank = {Extreme:0, Severe:1, Moderate:2, Minor:3, Unknown:4};
+      f.sort(function(a,b){ return (rank[a.severity]||4) - (rank[b.severity]||4); });
+      if (!f.length) { $("alert").style.display = "none"; return; }
+      var a = f[0], end = a.ends || a.expires, txtEnd = "";
+      if (end) txtEnd = " until " + new Date(end).toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit",timeZone:CONFIG.timezone});
+      $("alertText").textContent = a.event + txtEnd + (f.length > 1 ? "  +" + (f.length-1) : "");
+      $("alert").style.display = "flex";
+    } catch(e){}
+  }, function(){});
+}
+function refreshWeather(){ loadWeather(); loadAlerts(); }
+refreshWeather(); setInterval(refreshWeather, CONFIG.weatherRefreshMin*60*1000);
+
+/* ---- news: RSS feeds -> rotating Top Stories card + bottom headline crawl ---- */
+function clean(html){
+  if (!html) return "";
+  try { return (new DOMParser().parseFromString(html, "text/html").body.textContent || "").replace(/\s+/g," ").trim(); }
+  catch(e){ return String(html).replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim(); }
+}
+function parseDate(s){
+  if (!s) return 0;
+  // rss2json gives "YYYY-MM-DD HH:MM:SS" in UTC; browsers would wrongly read that as local time
+  var t = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(s) ? Date.parse(s.replace(" ","T")+"Z") : Date.parse(s);
+  return isNaN(t) ? 0 : t;
+}
+function fetchFeed(feed, done){
+  var out = [];
+  // 1) rss2json (JSON, CORS enabled)
+  get("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(feed.url), function(txt){
+    try {
+      var j = JSON.parse(txt);
+      if (j.status !== "ok" || !j.items || !j.items.length) throw 0;
+      j.items.forEach(function(it){ out.push({t:clean(it.title), s:clean(it.description), src:feed.name, at:parseDate(it.pubDate)}); });
+      done(out);
+    } catch(e){ viaProxy(); }
+  }, viaProxy);
+  // 2) fallback: raw XML through a CORS proxy
+  function viaProxy(){
+    get("https://api.allorigins.win/raw?url="+encodeURIComponent(feed.url), function(xml){
+      try {
+        var doc = new DOMParser().parseFromString(xml, "text/xml");
+        var items = doc.getElementsByTagName("item");
+        if (!items.length) items = doc.getElementsByTagName("entry");
+        for (var i=0;i<items.length && i<15;i++){
+          var g = function(tag){ var n = items[i].getElementsByTagName(tag)[0]; return n ? n.textContent : ""; };
+          out.push({t:clean(g("title")), s:clean(g("description") || g("summary")), src:feed.name, at:parseDate(g("pubDate") || g("updated") || g("published"))});
+        }
+      } catch(e){}
+      done(out);
+    }, function(){ done(out); }, 20000);
+  }
+}
+
+var STORIES = [], storyIdx = 0, storyTimer = null, tvNews = false;
+function loadNews(){
+  var pending = CONFIG.newsFeeds.length, all = [];
+  CONFIG.newsFeeds.forEach(function(f){
+    fetchFeed(f, function(items){
+      items.sort(function(a,b){ return b.at - a.at; });
+      all = all.concat(items.filter(function(x){ return x.t; }).slice(0, 8));
+      if (--pending === 0) gotNews(all);
+    });
+  });
+}
+function gotNews(all){
+  var seen = {}, list = [];
+  all.sort(function(a,b){ return b.at - a.at; });
+  all.forEach(function(x){ var k = x.t.toLowerCase().slice(0,60); if (!seen[k]) { seen[k] = 1; list.push(x); } });
+  if (!list.length) { newsFallback(); return; }
+  if (tvNews) {   // feeds recovered: swap the TradingView fallback back out
+    tvNews = false;
+    var w = document.querySelector("#stories .tradingview-widget-container"); if (w) w.parentNode.removeChild(w);
+    $("sBody").style.display = ""; document.querySelector("#stories .sbar").style.display = "";
+  }
+  STORIES = list.slice(0, 24);
+  buildCrawl(STORIES);
+  if (storyIdx >= STORIES.length) storyIdx = 0;
+  if (!storyTimer) { showStory(); storyTimer = setInterval(nextStory, CONFIG.storySeconds*1000); }
+}
+function ago(t){
+  if (!t) return "";
+  var m = Math.max(0, Math.round((Date.now() - t)/60000));
+  return m < 1 ? "just now" : m < 60 ? m + "m ago" : m < 1440 ? Math.round(m/60) + "h ago" : Math.round(m/1440) + "d ago";
+}
+function showStory(){
+  var s = STORIES[storyIdx]; if (!s) return;
+  $("sTitle").textContent = s.t;
+  $("sSum").textContent = s.s && s.s !== s.t ? s.s : "";
+  $("sMeta").textContent = s.src + (s.at ? "  ·  " + ago(s.at) : "") + "  ·  " + (storyIdx+1) + "/" + STORIES.length;
+  var p = $("sProg");
+  p.style.transition = "none"; p.style.width = "0";
+  setTimeout(function(){ p.style.transition = "width " + CONFIG.storySeconds + "s linear"; p.style.width = "100%"; }, 50);
+}
+function nextStory(){
+  var b = $("sBody"); b.className = "fade";
+  setTimeout(function(){ storyIdx = (storyIdx + 1) % STORIES.length; showStory(); b.className = ""; }, 600);
+}
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function buildCrawl(list){
+  var one = list.map(function(x){ return '<span class="src">'+esc(x.src)+'</span><span>'+esc(x.t)+'</span><span class="sep">|</span>'; }).join("");
+  var tr = $("track");
+  tr.style.animation = "none";
+  tr.innerHTML = one + one;                       // doubled so the loop is seamless
+  setTimeout(function(){
+    var half = tr.scrollWidth / 2;
+    tr.style.animation = "crawl " + Math.max(30, half / CONFIG.crawlSpeed) + "s linear infinite";
+  }, 100);
+}
+function newsFallback(){
+  // If every feed failed, show TradingView's market news list instead of an empty card.
+  $("track").innerHTML = '<span style="color:var(--dim)">Headlines unavailable right now, retrying shortly</span>';
+  if (tvNews) return; tvNews = true;
+  $("sBody").style.display = "none"; document.querySelector("#stories .sbar").style.display = "none"; $("sMeta").textContent = "TradingView";
+  tv("stories", "timeline", { feedMode:"market", market:"stock", colorTheme:"dark", isTransparent:true, displayMode:"compact", width:"100%", height:"100%", locale:"en" });
+}
+loadNews(); setInterval(loadNews, CONFIG.newsRefreshMin*60*1000);
 
 /* ---- TradingView widgets ---- */
 function tv(containerId, scriptName, cfg){
@@ -214,22 +465,18 @@ function tv(containerId, scriptName, cfg){
   box.appendChild(s);
   $(containerId).appendChild(box);
 }
-tv("ticker", "ticker-tape", {
-  symbols: CONFIG.tickers, colorTheme: "dark", isTransparent: true, displayMode: "adaptive", locale: "en"
-});
+tv("ticker", "ticker-tape", { symbols: CONFIG.tickers, colorTheme: "dark", isTransparent: true, displayMode: "regular", showSymbolLogo: true, locale: "en" });
 tv("chart", "advanced-chart", {
-  autosize: true, symbol: CONFIG.chartSymbol, interval: "D", timezone: CONFIG.timezone,
-  theme: "dark", style: "2", locale: "en", hide_top_toolbar: true, hide_legend: false,
-  hide_side_toolbar: true, allow_symbol_change: false, backgroundColor: "#131a26", gridColor: "rgba(0,0,0,0)"
+  autosize: true, symbol: CONFIG.chartSymbol, interval: "D", range: "6M", timezone: CONFIG.timezone,
+  theme: "dark", style: "3", locale: "en", hide_top_toolbar: true, hide_legend: false, hide_side_toolbar: true,
+  allow_symbol_change: false, save_image: false, backgroundColor: "rgba(0,0,0,0)", gridColor: "rgba(255,255,255,0.04)"
 });
 
-/* ---- reload nightly to keep a long-running page fresh ---- */
-setInterval(function(){ var n=new Date(); if(n.getHours()===4 && n.getMinutes()===0) location.reload(); }, 60000);
+/* ---- reload nightly so a page left on for weeks stays fresh ---- */
+setInterval(function(){ var n = new Date(); if (n.getHours()===4 && n.getMinutes()===0) location.reload(); }, 60000);
 
 /* ---- remote: red button reloads ---- */
-document.addEventListener("keydown", function(e){
-  if (e.keyCode === 403 || e.key === "r") { location.reload(); }
-});
+document.addEventListener("keydown", function(e){ if (e.keyCode === 403 || e.key === "r") location.reload(); });
 </script>
 </body>
 </html>
